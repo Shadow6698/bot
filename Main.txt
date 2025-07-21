@@ -1,0 +1,580 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+
+-- Variáveis de controle
+local jumping = false
+local tpLoop = false
+local lastHeadSitPlayer = nil
+local lastSeatConnections = {}
+
+-- Função para criar efeito de brilho
+local function createGlow(parent, color)
+    local glow = Instance.new("ImageLabel")
+    glow.Name = "Glow"
+    glow.Parent = parent
+    glow.BackgroundTransparency = 1
+    glow.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
+    glow.ImageColor3 = color
+    glow.ImageTransparency = 0.7
+    glow.Size = UDim2.new(1, 20, 1, 20)
+    glow.Position = UDim2.new(0, -10, 0, -10)
+    glow.ZIndex = parent.ZIndex - 1
+    
+    local glowCorner = Instance.new("UICorner", glow)
+    glowCorner.CornerRadius = UDim.new(0, 20)
+    
+    return glow
+end
+
+-- Função para animar botões
+local function animateButton(button, scale)
+    scale = scale or 0.95
+    local originalSize = button.Size
+    
+    local shrink = TweenService:Create(button, 
+        TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {Size = UDim2.new(originalSize.X.Scale * scale, originalSize.X.Offset * scale, 
+                          originalSize.Y.Scale * scale, originalSize.Y.Offset * scale)}
+    )
+    
+    local expand = TweenService:Create(button,
+        TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {Size = originalSize}
+    )
+    
+    shrink:Play()
+    shrink.Completed:Connect(function()
+        expand:Play()
+    end)
+end
+
+-- GUI Principal
+local screen = Instance.new("ScreenGui")
+screen.Name = "FuturisticControlGui"
+screen.Parent = player:WaitForChild("PlayerGui")
+screen.ResetOnSpawn = false
+
+-- Frame principal
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Parent = screen
+mainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+mainFrame.Size = UDim2.new(0, 350, 0, 400)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 25, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+
+-- Borda neon
+local border = Instance.new("UIStroke")
+border.Parent = mainFrame
+border.Color = Color3.fromRGB(0, 255, 255)
+border.Thickness = 2
+border.Transparency = 0.3
+
+-- Cantos arredondados
+local mainCorner = Instance.new("UICorner")
+mainCorner.Parent = mainFrame
+mainCorner.CornerRadius = UDim.new(0, 15)
+
+-- Efeito de brilho no frame principal
+createGlow(mainFrame, Color3.fromRGB(0, 255, 255))
+
+-- Header
+local header = Instance.new("Frame")
+header.Name = "Header"
+header.Parent = mainFrame
+header.Size = UDim2.new(1, 0, 0, 50)
+header.BackgroundColor3 = Color3.fromRGB(0, 40, 60)
+header.BorderSizePixel = 0
+
+local headerCorner = Instance.new("UICorner")
+headerCorner.Parent = header
+headerCorner.CornerRadius = UDim.new(0, 15)
+
+local headerStroke = Instance.new("UIStroke")
+headerStroke.Parent = header
+headerStroke.Color = Color3.fromRGB(0, 150, 255)
+headerStroke.Thickness = 1
+
+-- Título
+local title = Instance.new("TextLabel")
+title.Name = "Title"
+title.Parent = header
+title.Position = UDim2.new(0, 15, 0, 0)
+title.Size = UDim2.new(1, -60, 1, 0)
+title.BackgroundTransparency = 1
+title.Text = "🚀 CONTROL HUB"
+title.TextColor3 = Color3.fromRGB(0, 255, 255)
+title.TextSize = 20
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Botão minimizar
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Name = "MinimizeBtn"
+minimizeBtn.Parent = header
+minimizeBtn.Position = UDim2.new(1, -45, 0, 10)
+minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+minimizeBtn.Text = "—"
+minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
+minimizeBtn.TextSize = 16
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.BorderSizePixel = 0
+
+local minimizeCorner = Instance.new("UICorner")
+minimizeCorner.Parent = minimizeBtn
+minimizeCorner.CornerRadius = UDim.new(0, 8)
+
+-- Container das abas
+local tabContainer = Instance.new("Frame")
+tabContainer.Name = "TabContainer"
+tabContainer.Parent = mainFrame
+tabContainer.Position = UDim2.new(0, 0, 0, 55)
+tabContainer.Size = UDim2.new(1, 0, 0, 40)
+tabContainer.BackgroundTransparency = 1
+
+-- Abas
+local function createTab(name, position, icon)
+    local tab = Instance.new("TextButton")
+    tab.Name = name .. "Tab"
+    tab.Parent = tabContainer
+    tab.Position = UDim2.new(position, 5, 0, 5)
+    tab.Size = UDim2.new(0.5, -10, 0, 30)
+    tab.BackgroundColor3 = Color3.fromRGB(25, 35, 45)
+    tab.Text = icon .. " " .. name
+    tab.TextColor3 = Color3.fromRGB(150, 150, 150)
+    tab.TextSize = 14
+    tab.Font = Enum.Font.Gotham
+    tab.BorderSizePixel = 0
+    
+    local tabCorner = Instance.new("UICorner")
+    tabCorner.Parent = tab
+    tabCorner.CornerRadius = UDim.new(0, 8)
+    
+    local tabStroke = Instance.new("UIStroke")
+    tabStroke.Parent = tab
+    tabStroke.Color = Color3.fromRGB(60, 60, 60)
+    tabStroke.Thickness = 1
+    
+    return tab
+end
+
+local controlTab = createTab("Controles", 0, "🎮")
+local commandTab = createTab("Comandos", 0.5, "📋")
+
+-- Content Frame
+local contentFrame = Instance.new("Frame")
+contentFrame.Name = "ContentFrame"
+contentFrame.Parent = mainFrame
+contentFrame.Position = UDim2.new(0, 10, 0, 100)
+contentFrame.Size = UDim2.new(1, -20, 1, -110)
+contentFrame.BackgroundTransparency = 1
+
+-- Aba de Controles
+local controlContent = Instance.new("ScrollingFrame")
+controlContent.Name = "ControlContent"
+controlContent.Parent = contentFrame
+controlContent.Size = UDim2.new(1, 0, 1, 0)
+controlContent.BackgroundTransparency = 1
+controlContent.BorderSizePixel = 0
+controlContent.ScrollBarThickness = 6
+controlContent.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 255)
+controlContent.CanvasSize = UDim2.new(0, 0, 0, 500)
+
+-- Layout para controles
+local controlLayout = Instance.new("UIListLayout")
+controlLayout.Parent = controlContent
+controlLayout.SortOrder = Enum.SortOrder.LayoutOrder
+controlLayout.Padding = UDim.new(0, 10)
+
+-- Função para criar botões de controle
+local function createControlButton(parent, text, color, layoutOrder, callback)
+    local button = Instance.new("TextButton")
+    button.Name = text .. "Button"
+    button.Parent = parent
+    button.Size = UDim2.new(1, 0, 0, 45)
+    button.BackgroundColor3 = color
+    button.Text = text
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.TextSize = 16
+    button.Font = Enum.Font.GothamBold
+    button.BorderSizePixel = 0
+    button.LayoutOrder = layoutOrder
+    
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.Parent = button
+    buttonCorner.CornerRadius = UDim.new(0, 10)
+    
+    local buttonStroke = Instance.new("UIStroke")
+    buttonStroke.Parent = button
+    buttonStroke.Color = Color3.new(1, 1, 1)
+    buttonStroke.Thickness = 1
+    buttonStroke.Transparency = 0.7
+    
+    createGlow(button, color)
+    
+    button.MouseButton1Click:Connect(function()
+        animateButton(button)
+        if callback then callback() end
+    end)
+    
+    return button
+end
+
+-- Botões de controle
+createControlButton(controlContent, "🦘 PULAR AUTO", Color3.fromRGB(0, 150, 255), 1, function()
+    jumping = not jumping
+end)
+
+createControlButton(controlContent, "🛑 PARAR PULO", Color3.fromRGB(255, 100, 100), 2, function()
+    jumping = false
+end)
+
+createControlButton(controlContent, "🌀 TP LOOP", Color3.fromRGB(255, 150, 0), 3, function()
+    tpLoop = not tpLoop
+end)
+
+createControlButton(controlContent, "⏹️ PARAR TP", Color3.fromRGB(200, 50, 50), 4, function()
+    tpLoop = false
+end)
+
+createControlButton(controlContent, "💺 HEADSIT ALL", Color3.fromRGB(150, 0, 255), 5, function()
+    desconectarEApagarSeats()
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer ~= player then
+            task.spawn(function()
+                headsitPlayer(otherPlayer)
+            end)
+            task.wait(0.3)
+        end
+    end
+end)
+
+createControlButton(controlContent, "🚫 UNHEADSIT ALL", Color3.fromRGB(255, 0, 150), 6, function()
+    local char = player.Character or player.CharacterAdded:Wait()
+    if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
+        if lastHeadSitPlayer and lastHeadSitPlayer.Character and lastHeadSitPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local targetCFrame = lastHeadSitPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(3, 0, 0)
+            char.HumanoidRootPart.CFrame = targetCFrame
+        end
+        char.Humanoid.Sit = false
+        char.Humanoid.Jump = true
+    end
+    desconectarEApagarSeats()
+end)
+
+-- Aba de Comandos
+local commandContent = Instance.new("ScrollingFrame")
+commandContent.Name = "CommandContent"
+commandContent.Parent = contentFrame
+commandContent.Size = UDim2.new(1, 0, 1, 0)
+commandContent.BackgroundTransparency = 1
+commandContent.BorderSizePixel = 0
+commandContent.ScrollBarThickness = 6
+commandContent.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 255)
+commandContent.CanvasSize = UDim2.new(0, 0, 0, 400)
+commandContent.Visible = false
+
+-- Layout para comandos
+local commandLayout = Instance.new("UIListLayout")
+commandLayout.Parent = commandContent
+commandLayout.SortOrder = Enum.SortOrder.LayoutOrder
+commandLayout.Padding = UDim.new(0, 8)
+
+-- Função para criar item de comando
+local function createCommandItem(parent, command, description, layoutOrder)
+    local frame = Instance.new("Frame")
+    frame.Name = command .. "Frame"
+    frame.Parent = parent
+    frame.Size = UDim2.new(1, 0, 0, 50)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 30, 40)
+    frame.BorderSizePixel = 0
+    frame.LayoutOrder = layoutOrder
+    
+    local frameCorner = Instance.new("UICorner")
+    frameCorner.Parent = frame
+    frameCorner.CornerRadius = UDim.new(0, 8)
+    
+    local frameStroke = Instance.new("UIStroke")
+    frameStroke.Parent = frame
+    frameStroke.Color = Color3.fromRGB(0, 200, 255)
+    frameStroke.Thickness = 1
+    frameStroke.Transparency = 0.5
+    
+    local commandLabel = Instance.new("TextLabel")
+    commandLabel.Parent = frame
+    commandLabel.Position = UDim2.new(0, 10, 0, 5)
+    commandLabel.Size = UDim2.new(1, -20, 0, 20)
+    commandLabel.BackgroundTransparency = 1
+    commandLabel.Text = command
+    commandLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+    commandLabel.TextSize = 14
+    commandLabel.Font = Enum.Font.GothamBold
+    commandLabel.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local descLabel = Instance.new("TextLabel")
+    descLabel.Parent = frame
+    descLabel.Position = UDim2.new(0, 10, 0, 25)
+    descLabel.Size = UDim2.new(1, -20, 0, 20)
+    descLabel.BackgroundTransparency = 1
+    descLabel.Text = description
+    descLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+    descLabel.TextSize = 12
+    descLabel.Font = Enum.Font.Gotham
+    descLabel.TextXAlignment = Enum.TextXAlignment.Left
+    
+    return frame
+end
+
+-- Lista de comandos
+createCommandItem(commandContent, "pular", "Ativa o pulo automático", 1)
+createCommandItem(commandContent, "pararjump", "Para o pulo automático", 2)
+createCommandItem(commandContent, "tploop", "Ativa teleporte em loop para todos os players", 3)
+createCommandItem(commandContent, "stoptp", "Para o teleporte em loop", 4)
+createCommandItem(commandContent, "headsit all", "Senta na cabeça de todos os players", 5)
+createCommandItem(commandContent, "unheadsit all", "Para de sentar na cabeça dos players", 6)
+
+-- Caixa de comando personalizada
+local commandInputFrame = Instance.new("Frame")
+commandInputFrame.Name = "CommandInputFrame"
+commandInputFrame.Parent = commandContent
+commandInputFrame.Size = UDim2.new(1, 0, 0, 80)
+commandInputFrame.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
+commandInputFrame.BorderSizePixel = 0
+commandInputFrame.LayoutOrder = 7
+
+local inputCorner = Instance.new("UICorner")
+inputCorner.Parent = commandInputFrame
+inputCorner.CornerRadius = UDim.new(0, 10)
+
+local inputStroke = Instance.new("UIStroke")
+inputStroke.Parent = commandInputFrame
+inputStroke.Color = Color3.fromRGB(255, 200, 0)
+inputStroke.Thickness = 2
+
+local commandBox = Instance.new("TextBox")
+commandBox.Name = "CommandBox"
+commandBox.Parent = commandInputFrame
+commandBox.Position = UDim2.new(0, 10, 0, 10)
+commandBox.Size = UDim2.new(1, -20, 0, 30)
+commandBox.BackgroundColor3 = Color3.fromRGB(30, 40, 50)
+commandBox.Text = ""
+commandBox.PlaceholderText = "Digite um comando personalizado..."
+commandBox.TextColor3 = Color3.new(1, 1, 1)
+commandBox.TextSize = 14
+commandBox.Font = Enum.Font.Gotham
+commandBox.BorderSizePixel = 0
+
+local boxCorner = Instance.new("UICorner")
+boxCorner.Parent = commandBox
+boxCorner.CornerRadius = UDim.new(0, 8)
+
+local executeBtn = Instance.new("TextButton")
+executeBtn.Name = "ExecuteBtn"
+executeBtn.Parent = commandInputFrame
+executeBtn.Position = UDim2.new(0, 10, 0, 45)
+executeBtn.Size = UDim2.new(1, -20, 0, 25)
+executeBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+executeBtn.Text = "⚡ EXECUTAR"
+executeBtn.TextColor3 = Color3.new(1, 1, 1)
+executeBtn.TextSize = 12
+executeBtn.Font = Enum.Font.GothamBold
+executeBtn.BorderSizePixel = 0
+
+local execCorner = Instance.new("UICorner")
+execCorner.Parent = executeBtn
+execCorner.CornerRadius = UDim.new(0, 6)
+
+-- Sistema de abas
+local function switchTab(targetTab)
+    controlContent.Visible = (targetTab == "control")
+    commandContent.Visible = (targetTab == "command")
+    
+    -- Resetar cores das abas
+    controlTab.BackgroundColor3 = Color3.fromRGB(25, 35, 45)
+    controlTab.TextColor3 = Color3.fromRGB(150, 150, 150)
+    commandTab.BackgroundColor3 = Color3.fromRGB(25, 35, 45)
+    commandTab.TextColor3 = Color3.fromRGB(150, 150, 150)
+    
+    -- Ativar aba selecionada
+    if targetTab == "control" then
+        controlTab.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
+        controlTab.TextColor3 = Color3.new(1, 1, 1)
+    else
+        commandTab.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
+        commandTab.TextColor3 = Color3.new(1, 1, 1)
+    end
+end
+
+-- Eventos das abas
+controlTab.MouseButton1Click:Connect(function()
+    animateButton(controlTab)
+    switchTab("control")
+end)
+
+commandTab.MouseButton1Click:Connect(function()
+    animateButton(commandTab)
+    switchTab("command")
+end)
+
+-- Inicializar primeira aba
+switchTab("control")
+
+-- Sistema de minimizar
+local isMinimized = false
+minimizeBtn.MouseButton1Click:Connect(function()
+    animateButton(minimizeBtn, 0.8)
+    isMinimized = not isMinimized
+    
+    local targetSize = isMinimized and UDim2.new(0, 350, 0, 55) or UDim2.new(0, 350, 0, 400)
+    
+    local tween = TweenService:Create(mainFrame,
+        TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {Size = targetSize}
+    )
+    
+    tween:Play()
+    
+    minimizeBtn.Text = isMinimized and "+" or "—"
+    tabContainer.Visible = not isMinimized
+    contentFrame.Visible = not isMinimized
+end)
+
+-- Funções do sistema original
+local function desconectarEApagarSeats()
+    for _, seat in pairs(workspace:GetChildren()) do
+        if seat:IsA("Seat") and seat.Name == "AutoHeadSitSeat" then
+            seat:Destroy()
+        end
+    end
+    for _, conn in pairs(lastSeatConnections) do
+        if conn and conn.Connected then
+            conn:Disconnect()
+        end
+    end
+    lastSeatConnections = {}
+    lastHeadSitPlayer = nil
+end
+
+local function headsitPlayer(otherPlayer)
+    local char = player.Character or player.CharacterAdded:Wait()
+    if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") and otherPlayer.Character and otherPlayer.Character:FindFirstChild("Head") then
+        local humanoid = char.Humanoid
+
+        local seat = Instance.new("Seat")
+        seat.Name = "AutoHeadSitSeat"
+        seat.Size = Vector3.new(0.1, 0.1, 0.1)
+        seat.Transparency = 1
+        seat.CanCollide = false
+        seat.Anchored = true
+        seat.Parent = workspace
+
+        seat.CFrame = char.HumanoidRootPart.CFrame
+        humanoid.Sit = true
+        seat:Sit(humanoid)
+        task.wait(0.2)
+
+        local connection
+        connection = RunService.Heartbeat:Connect(function()
+            if otherPlayer.Character and otherPlayer.Character:FindFirstChild("Head") and char and char:FindFirstChild("HumanoidRootPart") then
+                local head = otherPlayer.Character.Head
+                local sitPos = head.CFrame * CFrame.new(0, 1.8, 0)
+                seat.CFrame = sitPos
+                char.HumanoidRootPart.CFrame = sitPos
+                char.HumanoidRootPart.Velocity = Vector3.zero
+                char.HumanoidRootPart.RotVelocity = Vector3.zero
+
+                lastHeadSitPlayer = otherPlayer
+            else
+                connection:Disconnect()
+                seat:Destroy()
+            end
+        end)
+
+        table.insert(lastSeatConnections, connection)
+    end
+end
+
+-- Loops auxiliares
+task.spawn(function()
+    while true do
+        if jumping then
+            local char = player.Character or player.CharacterAdded:Wait()
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid:GetState() ~= Enum.HumanoidStateType.Jumping then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+        task.wait(0.7)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if tpLoop then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local char = player.Character or player.CharacterAdded:Wait()
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        hrp.CFrame = p.Character.HumanoidRootPart.CFrame + Vector3.new(0, 2, 0)
+                        task.wait(0.3)
+                    end
+                end
+            end
+        end
+        task.wait(0.2)
+    end
+end)
+
+-- Executar comando personalizado
+executeBtn.MouseButton1Click:Connect(function()
+    animateButton(executeBtn)
+    local comando = commandBox.Text:lower()
+    commandBox.Text = ""
+
+    if comando == "pular" then
+        jumping = true
+    elseif comando == "pararjump" then
+        jumping = false
+    elseif comando == "tploop" then
+        tpLoop = true
+    elseif comando == "stoptp" then
+        tpLoop = false
+    elseif comando == "headsit all" then
+        desconectarEApagarSeats()
+        for _, otherPlayer in pairs(Players:GetPlayers()) do
+            if otherPlayer ~= player then
+                task.spawn(function()
+                    headsitPlayer(otherPlayer)
+                end)
+                task.wait(0.3)
+            end
+        end
+    elseif comando == "unheadsit all" then
+        local char = player.Character or player.CharacterAdded:Wait()
+        if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
+            if lastHeadSitPlayer and lastHeadSitPlayer.Character and lastHeadSitPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local targetCFrame = lastHeadSitPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(3, 0, 0)
+                char.HumanoidRootPart.CFrame = targetCFrame
+            end
+            char.Humanoid.Sit = false
+            char.Humanoid.Jump = true
+        end
+        desconectarEApagarSeats()
+    else
+        print("Comando não reconhecido:", comando)
+    end
+end)
+
+-- Fazer o frame ajustar para mobile
+if UserInputService.TouchEnabled then
+    mainFrame.Size = UDim2.new(0, 320, 0, 380)
+    mainFrame.Position = UDim2.new(0.5, -160, 0.5, -190)
+end
